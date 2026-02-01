@@ -31,3 +31,29 @@ import { useExploreAlert } from '../ExploreAlertContext';
             `}
           />
         )}   
+
+===========================
+import { useExploreAlert } from 'src/explore/components/ExploreAlertContext';
+  const { setAlert, clearAlert } = useExploreAlert();  
+
+  const showExploreAlert = useCallback(
+    (config: {
+      title: string;
+      bodyText: string | React.ReactNode;
+      type?: 'info' | 'warning' | 'error';
+      primaryButtonText?: string;
+      secondaryButtonText?: string;
+      primaryButtonAction?: () => void;
+      secondaryButtonAction?: () => void;
+    }) => {
+      setAlert({
+        type: 'warning',
+        ...config,
+      });
+    },
+    [setAlert],
+  );
+
+  const closeExploreAlert = useCallback(() => {
+    clearAlert();
+  }, [clearAlert]);
