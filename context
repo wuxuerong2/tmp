@@ -1,0 +1,70 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+import React, { createContext, useContext, useState, useCallback } from 'react';
+
+export interface ExploreAlertConfig {
+  title: string;
+  bodyText: string | React.ReactNode;
+  type?: 'info' | 'warning' | 'error';
+  primaryButtonText?: string;
+  secondaryButtonText?: string;
+  primaryButtonAction?: () => void;
+  secondaryButtonAction?: () => void;
+}
+
+interface ExploreAlertContextType {
+  alertConfig: ExploreAlertConfig | null;
+  setAlert: (config: ExploreAlertConfig | null) => void;
+  clearAlert: () => void;
+}
+
+const ExploreAlertContext = createContext<ExploreAlertContextType | undefined>(
+  undefined,
+);
+
+export const ExploreAlertProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
+  const [alertConfig, setAlertConfig] = useState<ExploreAlertConfig | null>(
+    null,
+  );
+
+  const setAlert = useCallback((config: ExploreAlertConfig | null) => {
+    setAlertConfig(config);
+  }, []);
+
+  const clearAlert = useCallback(() => {
+    setAlertConfig(null);
+  }, []);
+
+  return (
+    <ExploreAlertContext.Provider value={{ alertConfig, setAlert, clearAlert }}>
+      {children}
+    </ExploreAlertContext.Provider>
+  );
+};
+
+export const useExploreAlert = () => {
+  const context = useContext(ExploreAlertContext);
+  if (!context) {
+    throw new Error('useExploreAlert must be used within ExploreAlertProvider');
+  }
+  return context;
+};
+
