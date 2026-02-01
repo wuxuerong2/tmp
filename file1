@@ -1,0 +1,33 @@
+import { useExploreAlert } from '../ExploreAlertContext';
+
+ const { alertConfig: customAlertConfig } = useExploreAlert();  
+
+         {customAlertConfig && (
+          <ExploreAlert
+            title={customAlertConfig.title}
+            bodyText={customAlertConfig.bodyText}
+            type={customAlertConfig.type || 'warning'}
+            primaryButtonText={customAlertConfig.primaryButtonText}
+            secondaryButtonText={customAlertConfig.secondaryButtonText}
+            primaryButtonAction={
+              customAlertConfig.primaryButtonAction
+                ? () => {
+                    customAlertConfig.primaryButtonAction?.();
+                    clearAlert();
+                  }
+                : undefined
+            }
+            secondaryButtonAction={
+              customAlertConfig.secondaryButtonAction
+                ? () => {
+                    customAlertConfig.secondaryButtonAction?.();
+                    clearAlert();
+                  }
+                : undefined
+            }
+            onClose={clearAlert}
+            css={theme => css`
+              margin: 0 0 ${theme.gridUnit * 4}px 0;
+            `}
+          />
+        )}   
