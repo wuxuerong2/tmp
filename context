@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
 
 export interface ExploreAlertConfig {
   title: string;
@@ -53,8 +53,17 @@ export const ExploreAlertProvider: React.FC<{ children: React.ReactNode }> = ({
     setAlertConfig(null);
   }, []);
 
+  const value = useMemo(
+    () => ({
+      alertConfig,
+      setAlert,
+      clearAlert,
+    }),
+    [alertConfig, setAlert, clearAlert],
+  );
+
   return (
-    <ExploreAlertContext.Provider value={{ alertConfig, setAlert, clearAlert }}>
+    <ExploreAlertContext.Provider value={value}>
       {children}
     </ExploreAlertContext.Provider>
   );
