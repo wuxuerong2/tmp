@@ -38,34 +38,141 @@ const ExploreAlertContext = createContext<ExploreAlertContextType | undefined>(
   undefined,
 );
 
+// 用于追踪 Provider 实例
+let providerInstanceId = 0;
+
+// 全局状态追踪，用于检测是否有多个实例或重新创建
+type AlertConfigHistoryEntry = {
+  timestamp: number;
+  value: ExploreAlertConfig | null;
+  reason: string;
+};
+
+const providerInstances = new Map<number, {
+  createdAt: number;
+  alertConfigHistory: AlertConfigHistoryEntry[];
+}>();
+
 export const ExploreAlertProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
+  const instanceId = React.useRef(++providerInstanceId);
+  const mountTime = React.useRef(Date.now());
+  
+  // 初始化实例追踪
+  React.useEffect(() => {
+    providerInstances.set(instanceId.current, {
+      createdAt: mountTime.current,
+      alertConfigHistory: [{ timestamp: Date.now(), value: null, reason: 'initial state' }],
+    });
+    console.log(`🔵 ExploreAlertProvider: instance ${instanceId.current} MOUNTED at ${new Date(mountTime.current).toISOString()}`);
+    console.log(`🔵 Total active instances: ${providerInstances.size}`);
+    console.log(`🔵 All instances:`, Array.from(providerInstances.keys()));
+    
+    return () => {
+      const instance = providerInstances.get(instanceId.current);
+      const lifetime = Date.now() - mountTime.current;
+      console.log(`🔴 ExploreAlertProvider: instance ${instanceId.current} UNMOUNTING after ${lifetime}ms`);
+      console.log(`🔴 Instance ${instanceId.current} alertConfig history:`, instance?.alertConfigHistory);
+      providerInstances.delete(instanceId.current);
+      console.log(`🔴 Remaining active instances: ${providerInstances.size}`);
+    };
+  }, []);
+  
+  console.log(`⚪ ExploreAlertProvider: instance ${instanceId.current} rendering`);
+  
   const [alertConfig, setAlertConfig] = useState<ExploreAlertConfig | null>(
     null,
   );
 
   // 使用函数式更新确保状态正确更新
   const setAlert = useCallback((config: ExploreAlertConfig | null) => {
-    console.log('ExploreAlertContext: setAlert called with', config);
+    const timestamp = Date.now();
+    const reason = config === null ? 'setAlert(null) called' : 'setAlert(config) called';
+    
+    console.log(`🟢 ExploreAlertProvider: instance ${instanceId.current} - setAlert called with`, config);
+    console.log(`🟢 ExploreAlertProvider: instance ${instanceId.current} - setAlert config === null?`, config === null);
+    console.log(`🟢 ExploreAlertProvider: instance ${instanceId.current} - setAlert config === undefined?`, config === undefined);
+    console.trace(`🟢 ExploreAlertProvider: instance ${instanceId.current} - setAlert call stack`);
+    
     setAlertConfig(prevConfig => {
-      console.log('ExploreAlertContext: updating from', prevConfig, 'to', config);
+      console.log(`🟢 ExploreAlertProvider: instance ${instanceId.current} - updating from`, prevConfig, 'to', config);
+      
+      // 记录状态变化历史
+      const instance = providerInstances.get(instanceId.current);
+      if (instance) {
+        instance.alertConfigHistory.push({
+          timestamp,
+          value: config,
+          reason,
+        });
+        // 只保留最近 20 条记录
+        if (instance.alertConfigHistory.length > 20) {
+          instance.alertConfigHistory.shift();
+        }
+      }
+      
+      if (prevConfig !== config) {
+        console.log(`🟢 ExploreAlertProvider: instance ${instanceId.current} - state will change`);
+        if (config === null) {
+          console.warn(`⚠️ ExploreAlertProvider: instance ${instanceId.current} - WARNING: setting alertConfig to null!`);
+          console.warn(`⚠️ Previous value was:`, prevConfig);
+          console.trace(`⚠️ ExploreAlertProvider: instance ${instanceId.current} - setAlert(null) call stack`);
+        } else {
+          console.log(`✅ ExploreAlertProvider: instance ${instanceId.current} - setting alertConfig to:`, config);
+        }
+      } else {
+        console.log(`⚪ ExploreAlertProvider: instance ${instanceId.current} - state unchanged (same reference)`);
+      }
       return config;
     });
   }, []);
 
   const clearAlert = useCallback(() => {
-    console.log('ExploreAlertContext: clearAlert called');
+    console.log(`ExploreAlertProvider: instance ${instanceId.current} - clearAlert called`);
+    console.trace('ExploreAlertProvider: clearAlert call stack');
     setAlertConfig(prevConfig => {
-      console.log('ExploreAlertContext: clearing alert from', prevConfig);
+      console.log(`ExploreAlertProvider: instance ${instanceId.current} - clearing alert from`, prevConfig);
       return null;
     });
   }, []);
 
   // 添加调试日志来追踪 alertConfig 的变化
   useEffect(() => {
-    console.log('ExploreAlertContext: alertConfig state changed to', alertConfig);
+    const timestamp = Date.now();
+    const instance = providerInstances.get(instanceId.current);
+    
+    console.log(`🟡 ExploreAlertProvider: instance ${instanceId.current} - alertConfig state changed to`, alertConfig);
+    
+    if (alertConfig === null) {
+      // 检查是否是初始化（第一次渲染）
+      const isInitialRender = instance?.alertConfigHistory.length === 1 && 
+                              instance.alertConfigHistory[0].value === null;
+      
+      if (!isInitialRender) {
+        console.warn(`⚠️ ExploreAlertProvider: instance ${instanceId.current} - WARNING: alertConfig became null!`);
+        console.warn(`⚠️ Instance lifetime: ${Date.now() - mountTime.current}ms`);
+        console.warn(`⚠️ AlertConfig history:`, instance?.alertConfigHistory);
+        console.trace(`⚠️ ExploreAlertProvider: instance ${instanceId.current} - alertConfig became null - call stack`);
+        
+        // 记录到历史
+        if (instance) {
+          instance.alertConfigHistory.push({
+            timestamp,
+            value: null,
+            reason: 'state changed to null (unknown reason)',
+          });
+        }
+      } else {
+        console.log(`ℹ️ ExploreAlertProvider: instance ${instanceId.current} - initial state (null)`);
+      }
+    } else {
+      console.log(`✅ ExploreAlertProvider: instance ${instanceId.current} - alertConfig has value:`, alertConfig);
+    }
   }, [alertConfig]);
+  
+  // 追踪每次渲染时的 alertConfig 值
+  console.log(`⚪ ExploreAlertProvider: instance ${instanceId.current} - render with alertConfig:`, alertConfig);
 
   // 使用 useMemo 确保当 alertConfig 变化时，value 对象引用也会变化
   // 这样 React Context 才能正确检测到变化并触发更新
@@ -76,19 +183,43 @@ export const ExploreAlertProvider: React.FC<{ children: React.ReactNode }> = ({
         setAlert,
         clearAlert,
       };
-      console.log('ExploreAlertContext: creating value object with useMemo', {
+      console.log(`🔷 ExploreAlertContext: instance ${instanceId.current} - creating value object with useMemo`, {
+        'instanceId': instanceId.current,
         'newValue.alertConfig': newValue.alertConfig,
         'newValue.alertConfig type': typeof newValue.alertConfig,
         'newValue.alertConfig === null': newValue.alertConfig === null,
         'newValue.alertConfig === undefined': newValue.alertConfig === undefined,
+        'alertConfig from state': alertConfig,
         'hasSetAlert': !!newValue.setAlert,
         'hasClearAlert': !!newValue.clearAlert,
         'value object keys': Object.keys(newValue),
+        'value object reference': newValue,
       });
       return newValue;
     },
     [alertConfig, setAlert, clearAlert], // 依赖 alertConfig，确保变化时重新创建
   );
+  
+  // 额外检查：验证 useMemo 是否在 alertConfig 变化时重新计算
+  // 以及 value 对象中的 alertConfig 是否与状态中的 alertConfig 一致
+  useEffect(() => {
+    const valueMatchesState = value.alertConfig === alertConfig;
+    console.log(`🔷 ExploreAlertContext: instance ${instanceId.current} - useMemo dependencies check`, {
+      'alertConfig from state': alertConfig,
+      'value.alertConfig from context': value.alertConfig,
+      'values match?': valueMatchesState,
+      'setAlert reference': setAlert,
+      'clearAlert reference': clearAlert,
+      'value object reference': value,
+    });
+    
+    if (!valueMatchesState) {
+      console.error(`❌ ExploreAlertContext: instance ${instanceId.current} - MISMATCH!`);
+      console.error(`❌ State alertConfig:`, alertConfig);
+      console.error(`❌ Value alertConfig:`, value.alertConfig);
+      console.error(`❌ This should never happen!`);
+    }
+  }, [alertConfig, setAlert, clearAlert, value]);
 
   return (
     <ExploreAlertContext.Provider value={value}>
@@ -104,16 +235,40 @@ export const useExploreAlert = () => {
   }
   
   // 调试日志：检查从 Context 获取的值
-  console.log('useExploreAlert: context from useContext', context);
-  console.log('useExploreAlert: context.alertConfig', context.alertConfig);
-  console.log('useExploreAlert: context.alertConfig type', typeof context.alertConfig);
-  console.log('useExploreAlert: context.alertConfig === null?', context.alertConfig === null);
-  console.log('useExploreAlert: context.alertConfig === undefined?', context.alertConfig === undefined);
-  console.log('useExploreAlert: context keys', Object.keys(context));
-  console.log('useExploreAlert: has alertConfig property?', 'alertConfig' in context);
-  console.log('useExploreAlert: context.alertConfig value', JSON.stringify(context.alertConfig));
+  const componentName = new Error().stack?.split('\n')[2]?.trim() || 'unknown';
+  console.log(`🔍 useExploreAlert called from:`, componentName);
+  console.log(`🔍 useExploreAlert: context from useContext`, context);
+  console.log(`🔍 useExploreAlert: context.alertConfig`, context.alertConfig);
+  console.log(`🔍 useExploreAlert: context.alertConfig type`, typeof context.alertConfig);
+  console.log(`🔍 useExploreAlert: context.alertConfig === null?`, context.alertConfig === null);
+  console.log(`🔍 useExploreAlert: context.alertConfig === undefined?`, context.alertConfig === undefined);
+  console.log(`🔍 useExploreAlert: context keys`, Object.keys(context));
+  console.log(`🔍 useExploreAlert: has alertConfig property?`, 'alertConfig' in context);
+  console.log(`🔍 useExploreAlert: context.alertConfig value`, JSON.stringify(context.alertConfig));
+  
+  // 检查是否有多个 Provider 实例
+  if (providerInstances.size > 1) {
+    console.warn(`⚠️ WARNING: Multiple ExploreAlertProvider instances detected! Count: ${providerInstances.size}`);
+    console.warn(`⚠️ Active instances:`, Array.from(providerInstances.keys()));
+    console.warn(`⚠️ This may cause context state to be lost!`);
+  }
   
   return context;
 };
+
+// 导出调试函数，可以在浏览器控制台中使用
+if (typeof window !== 'undefined') {
+  (window as any).__exploreAlertDebug = {
+    getInstances: () => Array.from(providerInstances.entries()),
+    getInstanceHistory: (id: number) => providerInstances.get(id)?.alertConfigHistory,
+    getAllHistory: () => {
+      const all: Record<number, any> = {};
+      providerInstances.forEach((value, key) => {
+        all[key] = value;
+      });
+      return all;
+    },
+  };
+}
 
 
